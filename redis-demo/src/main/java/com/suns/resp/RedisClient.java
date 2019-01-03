@@ -9,11 +9,10 @@
 package com.suns.resp;
 
 
-
-
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
-import java.util.logging.ConsoleHandler;
 
 /**
  * ClassName: RedisClient <br>
@@ -85,7 +84,8 @@ public class RedisClient {
     public static void main(String[] args) {
         try{
 
-            RedisClient redisClient = new RedisClient("127.0.0.1", 6379);
+//            RedisClient redisClient = new RedisClient("127.0.0.1", 6379);
+            RedisClient redisClient = new RedisClient("47.107.146.57", 6380);
             redisClient.set("test","vvv");
             redisClient.get("test");
 
