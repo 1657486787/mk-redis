@@ -1,0 +1,20 @@
+redis客户端jedis
+1.引入依赖
+    <dependency>
+        <groupId>redis.clients</groupId>
+        <artifactId>jedis</artifactId>
+        <version>2.9.0</version>
+    </dependency>
+2.jedis客户端的使用
+    2.1启动redis
+    2.2使用jedis连接redis服务器，并测试set,get等命令
+    详见com.suns.start
+3.resp：redis serializtion protocol（tcp的应用层协议redis序列化协议）
+    3.1自己模拟redis服务器
+       服务器：RedisServer
+       客户端：使用jedis发送RedisTest
+    3.2自己模拟redis客户端
+        服务器：启动redis的服务器
+        客户端：RedisClient
+    详见com.suns.resp
+4.

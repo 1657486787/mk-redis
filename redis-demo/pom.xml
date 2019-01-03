@@ -10,10 +10,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.suns</groupId>
-    <artifactId>redis-article</artifactId>
+    <artifactId>redis-demo</artifactId>
     <version>1.0</version>
 
-    <name>redis-article</name>
+    <name>redis-demo</name>
     <!-- FIXME change it to the project's website -->
     <url>http://www.example.com</url>
 
@@ -24,16 +24,25 @@
     </properties>
 
     <dependencies>
+
         <dependency>
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
             <version>2.9.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.11</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.12</version>
-            <scope>test</scope>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
+
 </project>

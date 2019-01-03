@@ -10,6 +10,7 @@
   <version>1.0</version>
   <modules>
     <module>redis-article</module>
+      <module>redis-demo</module>
   </modules>
 
   <name>mk-redis</name>
