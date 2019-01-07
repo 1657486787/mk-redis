@@ -1,108 +1,56 @@
-package com.suns.utils;
-
-import redis.clients.jedis.BinaryClient.LIST_POSITION;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.Pipeline;
+package com.suns.util;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.stereotype.Component;
+
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.Pipeline;
+import redis.clients.jedis.BinaryClient.LIST_POSITION;
+
 /**
- * redis通用工具类
+ * jedis工具类
  */
+@Component
 public class JedisUtils {
 
 	private JedisPool pool = null;
+	private String ip = "47.107.146.57";
+	private int port = 6379;
+	private String auth = "111111";
 
 	/**
-	 * 传入ip和端口号构建redis 连接池
+	 * 传入ip和端口号构建redis 连接
 	 * 
 	 * @param ip
 	 *            ip
 	 * @param prot
 	 *            端口
 	 */
-	public JedisUtils(String ip, int prot, String auth) {
+	public JedisUtils() {
 		if (pool == null) {
 			JedisPoolConfig config = new JedisPoolConfig();
-			// 控制一个pool可分配多少个jedis实例，通过pool.getResource()来获取；
-			// 如果赋值为-1，则表示不限制；如果pool已经分配了maxActive个jedis实例，则此时pool的状态为exhausted(耗尽)。
-			// pool2中修改如下：
-			// maxActive ==> maxTotal
-			// maxWait ==> maxWaitMillis
-			//config.setMaxActive(500);
 			config.setMaxTotal(500);
-			// config.setMaxTotal(500);
-			// 控制一个pool最多有多少个状态为idle(空闲的)的jedis实例。
 			config.setMaxIdle(5);
-			// 表示当borrow(引入)一个jedis实例时，最大的等待时间，如果超过等待时间，则直接抛出JedisConnectionException；
-			//config.setMaxWait(1000 * 100);
 			config.setMaxWaitMillis(100);
-			// config.setMaxWaitMillis(1000 * 100);
-			// 在borrow一个jedis实例时，是否提前进行validate操作；如果为true，则得到的jedis实例均是可用的；
 			config.setTestOnBorrow(true);
-			// pool = new JedisPool(config, "192.168.0.121", 6379, 100000);
-			pool = new JedisPool(config, ip, prot, 100000, auth);
+			pool = new JedisPool(config, this.ip, this.port, 100000, this.auth);
 		}
 	}
 
 	/**
-	 * 通过配置对象 ip 端口 构建连接池
-	 * 
-	 * @param config
-	 *            配置对象
-	 * @param ip
-	 *            ip
-	 * @param prot
-	 *            端口
-	 */
-	public JedisUtils(JedisPoolConfig config, String ip, int prot) {
-		if (pool == null) {
-			pool = new JedisPool(config, ip, prot, 10000);
-		}
-	}
-
-	/**
-	 * 通过配置对象 ip 端口 超时时间 构建连接池
-	 *
-	 * @param config
-	 *            配置对象
-	 * @param ip
-	 *            ip
-	 * @param prot
-	 *            端口
-	 * @param timeout
-	 *            超时时间
-	 */
-	public JedisUtils(JedisPoolConfig config, String ip, int prot, int timeout) {
-		if (pool == null) {
-			pool = new JedisPool(config, ip, prot, timeout);
-		}
-	}
-
-	/**
-	 * 通过连接池对象 构建一个连接池
-	 * 
-	 * @param pool
-	 *            连接池对象
-	 */
-	public JedisUtils(JedisPool pool) {
-		if (this.pool == null) {
-			this.pool = pool;
-		}
-	}
-
-	/**
-	 * 通过key获取储存在redis中的value 并释放连接
+	 * 通过key获取储存在redis中的value 并释放连
 	 * 
 	 * @param key
 	 * @return 成功返回value 失败返回null
 	 */
 	public String get(String key) {
 		Jedis jedis = null;
+		
 		String value = null;
 		try {
 			jedis = pool.getResource();
@@ -117,7 +65,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 向redis存入key和value,并释放连接资源 如果key已经存在 则覆盖
+	 * 向redis存入key和value,并释放连接资 如果key已经存在 则覆
 	 * 
 	 * @param key
 	 * @param value
@@ -126,7 +74,7 @@ public class JedisUtils {
 	public String set(String key, String value) {
 		Jedis jedis = null;
 		try {
-			jedis = pool.getResource();//每次操作时向pool借用一个jedis对象，用完即还。
+			jedis = pool.getResource();//每次操作时向pool借用个jedis对象，用完即还?
 			return jedis.set(key, value);
 		} catch (Exception e) {
 			pool.returnBrokenResource(jedis);
@@ -136,47 +84,9 @@ public class JedisUtils {
 			returnResource(pool, jedis);
 		}
 	}
-	public String flushall() {
-		Jedis jedis = null;
-		try {
-			jedis = pool.getResource();//每次操作时向pool借用一个jedis对象，用完即还。
-			return jedis.flushAll();
-		} catch (Exception e) {
-			pool.returnBrokenResource(jedis);
-			e.printStackTrace();
-			return "0";
-		} finally {
-			returnResource(pool, jedis);
-		}
-	}
-	public String scriptLoad(String script) {
-		Jedis jedis = null;
-		try {
-			jedis = pool.getResource();//每次操作时向pool借用一个jedis对象，用完即还。
-			return jedis.scriptLoad(script);
-		} catch (Exception e) {
-			pool.returnBrokenResource(jedis);
-			e.printStackTrace();
-			return "0";
-		} finally {
-			returnResource(pool, jedis);
-		}
-	}
-	public Object eval(String s1,int i1,String s2, String s3, String s4, String s5) {
-		Jedis jedis = null;
-		try {
-			jedis = pool.getResource();//每次操作时向pool借用一个jedis对象，用完即还。
-			return jedis.eval(s1,i1,s2,s3,s4,s5);
-		} catch (Exception e) {
-			pool.returnBrokenResource(jedis);
-			e.printStackTrace();
-			return "0";
-		} finally {
-			returnResource(pool, jedis);
-		}
-	}
+
 	/**
-	 * 向redis存入序列化的key和value,并释放连接资源 如果key已经存在 则覆盖
+	 * 向redis存入序列化的key和value,并释放连接资 如果key已经存在 则覆
 	 * 
 	 * @param key
 	 * @param value
@@ -196,7 +106,7 @@ public class JedisUtils {
 		}
 	}
 	/**
-	 * 通过序列化key获取储存在redis中的序列化value值 并释放连接
+	 * 通过序列化key获取储存在redis中的序列化value 并释放连
 	 * 
 	 * @param key
 	 * @return 成功返回value 失败返回null
@@ -216,11 +126,11 @@ public class JedisUtils {
 		return value;
 	}
 	/**
-	 * 删除指定的key,也可以传入一个包含key的数组
+	 * 删除指定的key,也可以传入一个包含key的数
 	 * 
 	 * @param keys
-	 *            一个key 也可以使 string 数组
-	 * @return 返回删除成功的个数
+	 *            个key 也可以使 string 数组
+	 * @return 返回删除成功的个
 	 */
 	public Long del(String... keys) {
 		Jedis jedis = null;
@@ -237,11 +147,11 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key向指定的value值追加值
+	 * 通过key向指定的value值追加?
 	 * 
 	 * @param key
 	 * @param str
-	 * @return 成功返回 添加后value的长度 失败 返回 添加的 value 的长度 异常返回0L
+	 * @return 成功返回 添加后value的长 失败 返回 添加 value 的长 异常返回0L
 	 */
 	public Long append(String key, String str) {
 		Jedis jedis = null;
@@ -280,11 +190,11 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 设置key value,如果key已经存在则返回0,nx==> not exist
+	 * 设置key value,如果key已经存在则返0,nx==> not exist
 	 * 
 	 * @param key
 	 * @param value
-	 * @return 成功返回1 如果存在 和 发生异常 返回 0
+	 * @return 成功返回1 如果存在  发生异常 返回 0
 	 */
 	public Long setnx(String key, String value) {
 		Jedis jedis = null;
@@ -301,12 +211,12 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 设置key value并制定这个键值的有效期
+	 * 设置key value并制定这个键值的有效
 	 * 
 	 * @param key
 	 * @param value
 	 * @param seconds
-	 *            单位:秒
+	 *            单位:
 	 * @return 成功返回OK 失败和异常返回null
 	 */
 	public String setex(String key, String value, int seconds) {
@@ -325,15 +235,15 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key 和offset 从指定的位置开始将原先value替换 下标从0开始,offset表示从offset下标开始替换
-	 * 如果替换的字符串长度过小则会这样 example: value : bigsea@zto.cn str : abc 从下标7开始替换 则结果为
+	 * 通过key 和offset 从指定的位置始将原先value替换 下标0,offset表示从offset下标始替
+	 * 如果替换的字符串长度过小则会这样 example: value : bigsea@zto.cn str : abc 从下7始替 则结果为
 	 * RES : bigsea.abc.cn
 	 * 
 	 * @param key
 	 * @param str
 	 * @param offset
 	 *            下标位置
-	 * @return 返回替换后 value 的长度
+	 * @return 返回替换 value 的长
 	 */
 	public Long setrange(String key, String str, int offset) {
 		Jedis jedis = null;
@@ -353,8 +263,8 @@ public class JedisUtils {
 	 * 通过批量的key获取批量的value
 	 * 
 	 * @param keys
-	 *            string数组 也可以是一个key
-	 * @return 成功返回value的集合, 失败返回null的集合 ,异常返回空
+	 *            string数组 也可以是个key
+	 * @return 成功返回value的集, 失败返回null的集 ,异常返回
 	 */
 	public List<String> mget(String... keys) {
 		Jedis jedis = null;
@@ -372,7 +282,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 批量的设置key:value,可以一个 example: obj.mset(new
+	 * 批量的设置key:value,可以 example: obj.mset(new
 	 * String[]{"key2","value1","key2","value2"})
 	 * 
 	 * @param keysvalues
@@ -394,7 +304,7 @@ public class JedisUtils {
 		return res;
 	}
 	/**
-	 * 删除多个字符串key 并释放连接
+	 * 删除多个字符串key 并释放连
 	 * 
 	 * @param key*
 	 * @return 成功返回value 失败返回null
@@ -403,12 +313,12 @@ public class JedisUtils {
 		Jedis jedis = null;
 		boolean flag = false;
 		try {
-			jedis = pool.getResource();//从连接借用Jedis对象
+			jedis = pool.getResource();//从连接�用Jedis对象
 			Pipeline pipe = jedis.pipelined();//获取jedis对象的pipeline对象
 			for(String key:keys){
-				pipe.del(key); //将多个key放入pipe删除指令中
+				pipe.del(key); //将多个key放入pipe删除指令
 			}
-			pipe.sync(); //执行命令，完全此时pipeline对象的远程调用 
+			pipe.sync(); //执行命令，完全此时pipeline对象的远程调 
 			flag = true;
 		} catch (Exception e) {
 			pool.returnBrokenResource(jedis);
@@ -419,7 +329,7 @@ public class JedisUtils {
 		return flag;
 	}
 	/**
-	 * 批量的设置key:value,可以一个,如果key已经存在则会失败,操作会回滚 example: obj.msetnx(new
+	 * 批量的设置key:value,可以,如果key已经存在则会失败,操作会回 example: obj.msetnx(new
 	 * String[]{"key2","value1","key2","value2"})
 	 * 
 	 * @param keysvalues
@@ -441,11 +351,11 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 设置key的值,并返回一个旧值
+	 * 设置key的?,并返回一个旧
 	 * 
 	 * @param key
 	 * @param value
-	 * @return 旧值 如果key不存在 则返回null
+	 * @return 旧? 如果key不存 则返回null
 	 */
 	public String getset(String key, String value) {
 		Jedis jedis = null;
@@ -463,11 +373,11 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过下标 和key 获取指定下标位置的 value
+	 * 通过下标 和key 获取指定下标位置 value
 	 * 
 	 * @param key
 	 * @param startOffset
-	 *            开始位置 从0 开始 负数表示从右边开始截取
+	 *            始位 0  负数表示从右边开始截
 	 * @param endOffset
 	 * @return 如果没有返回null
 	 */
@@ -487,10 +397,10 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key 对value进行加值+1操作,当value不是int类型时会返回错误,当key不存在是则value为1
+	 * 通过key 对value进行加?+1操作,当value不是int类型时会返回错误,当key不存在是则value1
 	 * 
 	 * @param key
-	 * @return 加值后的结果
+	 * @return 加�后的结
 	 */
 	public Long incr(String key) {
 		Jedis jedis = null;
@@ -508,7 +418,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key给指定的value加值,如果key不存在,则这是value为该值
+	 * 通过key给指定的value加?,如果key不存,则这是value为该
 	 * 
 	 * @param key
 	 * @param integer
@@ -530,7 +440,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 对key的值做减减操作,如果key不存在,则设置key为-1
+	 * 对key的�做减减操作,如果key不存,则设置key-1
 	 * 
 	 * @param key
 	 * @return
@@ -551,7 +461,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 减去指定的值
+	 * 减去指定的?
 	 * 
 	 * @param key
 	 * @param integer
@@ -594,7 +504,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key给field设置指定的值,如果key不存在,则先创建
+	 * 通过key给field设置指定的?,如果key不存,则先创建
 	 * 
 	 * @param key
 	 * @param field
@@ -618,7 +528,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key给field设置指定的值,如果key不存在则先创建,如果field已经存在,返回0
+	 * 通过key给field设置指定的?,如果key不存在则先创,如果field已经存在,返回0
 	 * 
 	 * @param key
 	 * @param field
@@ -652,7 +562,7 @@ public class JedisUtils {
 		String res = null;
 		try {
 			jedis = pool.getResource();
-			res = jedis.hmset(key, hash);
+			res = jedis.hmset(key, hash);			
 		} catch (Exception e) {
 			pool.returnBrokenResource(jedis);
 			e.printStackTrace();
@@ -663,7 +573,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key 和 field 获取指定的 value
+	 * 通过key  field 获取指定 value
 	 * 
 	 * @param key
 	 * @param field
@@ -685,11 +595,11 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key 和 fields 获取指定的value 如果没有对应的value则返回null
+	 * 通过key  fields 获取指定的value 如果没有对应的value则返回null
 	 * 
 	 * @param key
 	 * @param fields
-	 *            可以使 一个String 也可以是 String数组
+	 *            可以 个String 也可以是 String数组
 	 * @return
 	 */
 	public List<String> hmget(String key, String... fields) {
@@ -708,7 +618,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key给指定的field的value加上给定的值
+	 * 通过key给指定的field的value加上给定的?
 	 * 
 	 * @param key
 	 * @param field
@@ -753,7 +663,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key返回field的数量
+	 * 通过key返回field的数
 	 * 
 	 * @param key
 	 * @return
@@ -773,13 +683,27 @@ public class JedisUtils {
 		return res;
 
 	}
+	public Map<String,String> hgetAll(String key) {
+		Jedis jedis = null;
+		Map<String,String> res = null;
+		try {
+			jedis = pool.getResource();
+			res = jedis.hgetAll(key);
+		} catch (Exception e) {
+			pool.returnBrokenResource(jedis);
+			e.printStackTrace();
+		} finally {
+			returnResource(pool, jedis);
+		}
+		return res;
 
+	}
 	/**
-	 * 通过key 删除指定的 field
+	 * 通过key 删除指定 field
 	 * 
 	 * @param key
 	 * @param fields
-	 *            可以是 一个 field 也可以是 一个数组
+	 *            可以  field 也可以是 个数
 	 * @return
 	 */
 	public Long hdel(String key, String... fields) {
@@ -796,9 +720,22 @@ public class JedisUtils {
 		}
 		return res;
 	}
-
+		public Set<String> zrange(String key, Long start, Long end) {
+			Jedis jedis = null;
+			Set<String> res = null;
+			try {
+				jedis = pool.getResource();
+				res = jedis.zrange(key, start, end);
+			} catch (Exception e) {
+				pool.returnBrokenResource(jedis);
+				e.printStackTrace();
+			} finally {
+				returnResource(pool, jedis);
+			}
+			return res;
+		}
 	/**
-	 * 通过key返回所有的field
+	 * 通过key返回有的field
 	 * 
 	 * @param key
 	 * @return
@@ -819,7 +756,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key返回所有和key有关的value
+	 * 通过key返回有和key有关的value
 	 * 
 	 * @param key
 	 * @return
@@ -840,7 +777,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key获取所有的field和value
+	 * 通过key获取有的field和value
 	 * 
 	 * @param key
 	 * @return
@@ -862,7 +799,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key向list头部添加字符串
+	 * 通过key向list头部添加字符
 	 * </p>
 	 * 
 	 * @param key
@@ -887,7 +824,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key向list尾部添加字符串
+	 * 通过key向list尾部添加字符
 	 * </p>
 	 * 
 	 * @param key
@@ -912,7 +849,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key在list指定的位置之前或者之后 添加字符串元素
+	 * 通过key在list指定的位置之前或者之 添加字符串元
 	 * </p>
 	 * 
 	 * @param key
@@ -949,7 +886,7 @@ public class JedisUtils {
 	 * 
 	 * @param key
 	 * @param index
-	 *            从0开始
+	 *            0
 	 * @param value
 	 * @return 成功返回OK
 	 */
@@ -970,12 +907,12 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key从对应的list中删除指定的count个 和 value相同的元素
+	 * 通过key从对应的list中删除指定的count  value相同的元
 	 * </p>
 	 * 
 	 * @param key
 	 * @param count
-	 *            当count为0时删除全部
+	 *            当count0时删除全
 	 * @param value
 	 * @return 返回被删除的个数
 	 */
@@ -996,7 +933,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key保留list中从strat下标开始到end下标结束的value值
+	 * 通过key保留list中从strat下标始到end下标结束的value
 	 * </p>
 	 * 
 	 * @param key
@@ -1044,7 +981,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key从list尾部删除一个value,并返回该元素
+	 * 通过key从list尾部删除个value,并返回该元素
 	 * </p>
 	 * 
 	 * @param key
@@ -1067,10 +1004,10 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key从一个list的尾部删除一个value并添加到另一个list的头部,并返回该value
+	 * 通过key从一个list的尾部删除一个value并添加到另一个list的头,并返回该value
 	 * </p>
 	 * <p>
-	 * 如果第一个list为空或者不存在则返回null
+	 * 如果第一个list为空或�不存在则返回null
 	 * </p>
 	 * 
 	 * @param srckey
@@ -1118,7 +1055,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key返回list的长度
+	 * 通过key返回list的长
 	 * </p>
 	 * 
 	 * @param key
@@ -1144,7 +1081,7 @@ public class JedisUtils {
 	 * 通过key获取list指定下标位置的value
 	 * </p>
 	 * <p>
-	 * 如果start 为 0 end 为 -1 则返回全部的list中的value
+	 * 如果start  0 end  -1 则返回全部的list中的value
 	 * </p>
 	 * 
 	 * @param key
@@ -1174,8 +1111,8 @@ public class JedisUtils {
 	 * 
 	 * @param key
 	 * @param members
-	 *            可以是一个String 也可以是一个String数组
-	 * @return 添加成功的个数
+	 *            可以是一个String 也可以是个String数组
+	 * @return 添加成功的个
 	 */
 	public Long sadd(String key, String... members) {
 		Jedis jedis = null;
@@ -1191,16 +1128,29 @@ public class JedisUtils {
 		}
 		return res;
 	}
-
+	
+	public void expire(String key, int times) {
+		Jedis jedis = null;
+		 
+		try {
+			jedis = pool.getResource();
+			jedis.expire(key, times);
+		} catch (Exception e) {
+			pool.returnBrokenResource(jedis);
+			e.printStackTrace();
+		} finally {
+			returnResource(pool, jedis);
+		}
+	}
 	/**
 	 * <p>
-	 * 通过key删除set中对应的value值
+	 * 通过key删除set中对应的value
 	 * </p>
 	 * 
 	 * @param key
 	 * @param members
-	 *            可以是一个String 也可以是一个String数组
-	 * @return 删除的个数
+	 *            可以是一个String 也可以是个String数组
+	 * @return 删除的个
 	 */
 	public Long srem(String key, String... members) {
 		Jedis jedis = null;
@@ -1219,7 +1169,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key随机删除一个set中的value并返回该值
+	 * 通过key随机删除个set中的value并返回该
 	 * </p>
 	 * 
 	 * @param key
@@ -1245,7 +1195,7 @@ public class JedisUtils {
 	 * 通过key获取set中的差集
 	 * </p>
 	 * <p>
-	 * 以第一个set为标准
+	 * 以第个set为标
 	 * </p>
 	 * 
 	 * @param keys
@@ -1269,10 +1219,10 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key获取set中的差集并存入到另一个key中
+	 * 通过key获取set中的差集并存入到另一个key
 	 * </p>
 	 * <p>
-	 * 以第一个set为标准
+	 * 以第个set为标
 	 * </p>
 	 * 
 	 * @param dstkey
@@ -1302,7 +1252,7 @@ public class JedisUtils {
 	 * </p>
 	 * 
 	 * @param keys
-	 *            可以使一个string 也可以是一个string数组
+	 *            可以使一个string 也可以是个string数组
 	 * @return
 	 */
 	public Set<String> sinter(String... keys) {
@@ -1322,12 +1272,12 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key获取指定set中的交集 并将结果存入新的set中
+	 * 通过key获取指定set中的交集 并将结果存入新的set
 	 * </p>
 	 * 
 	 * @param dstkey
 	 * @param keys
-	 *            可以使一个string 也可以是一个string数组
+	 *            可以使一个string 也可以是个string数组
 	 * @return
 	 */
 	public Long sinterstore(String dstkey, String... keys) {
@@ -1347,11 +1297,11 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key返回所有set的并集
+	 * 通过key返回有set的并
 	 * </p>
 	 * 
 	 * @param keys
-	 *            可以使一个string 也可以是一个string数组
+	 *            可以使一个string 也可以是个string数组
 	 * @return
 	 */
 	public Set<String> sunion(String... keys) {
@@ -1371,12 +1321,12 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key返回所有set的并集,并存入到新的set中
+	 * 通过key返回有set的并,并存入到新的set
 	 * </p>
 	 * 
 	 * @param dstkey
 	 * @param keys
-	 *            可以使一个string 也可以是一个string数组
+	 *            可以使一个string 也可以是个string数组
 	 * @return
 	 */
 	public Long sunionstore(String dstkey, String... keys) {
@@ -1396,13 +1346,13 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key将set中的value移除并添加到第二个set中
+	 * 通过key将set中的value移除并添加到第二个set
 	 * </p>
 	 * 
 	 * @param srckey
-	 *            需要移除的
+	 *            要移除的
 	 * @param dstkey
-	 *            添加的
+	 *            添加
 	 * @param member
 	 *            set中的value
 	 * @return
@@ -1424,7 +1374,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key获取set中value的个数
+	 * 通过key获取set中value的个
 	 * </p>
 	 * 
 	 * @param key
@@ -1471,7 +1421,7 @@ public class JedisUtils {
 
 	/**
 	 * <p>
-	 * 通过key获取set中随机的value,不删除元素
+	 * 通过key获取set中随机的value,不删除元
 	 * </p>
 	 * 
 	 * @param key
@@ -1516,7 +1466,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key向zset中添加value,score,其中score就是用来排序的 如果该value已经存在则根据score更新元素
+	 * 通过key向zset中添加value,score,其中score就是用来排序 如果该value已经存在则根据score更新元素
 	 * 
 	 * @param key
 	 * @param scoreMembers
@@ -1538,7 +1488,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key向zset中添加value,score,其中score就是用来排序的 如果该value已经存在则根据score更新元素
+	 * 通过key向zset中添加value,score,其中score就是用来排序 如果该value已经存在则根据score更新元素
 	 * 
 	 * @param key
 	 * @param score
@@ -1565,7 +1515,7 @@ public class JedisUtils {
 	 * 
 	 * @param key
 	 * @param members
-	 *            可以使一个string 也可以是一个string数组
+	 *            可以使一个string 也可以是个string数组
 	 * @return
 	 */
 	public Long zrem(String key, String... members) {
@@ -1584,7 +1534,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key增加该zset中value的score的值
+	 * 通过key增加该zset中value的score的?
 	 * 
 	 * @param key
 	 * @param score
@@ -1605,9 +1555,22 @@ public class JedisUtils {
 		}
 		return res;
 	}
-
+	public long hincrBy(String key, String field, long value) {
+		Jedis jedis = null;
+		long res = 0l;
+		try {
+			jedis = pool.getResource();
+			res = jedis.hincrBy(key, field, value);
+		} catch (Exception e) {
+			pool.returnBrokenResource(jedis);
+			e.printStackTrace();
+		} finally {
+			returnResource(pool, jedis);
+		}
+		return res;
+	}
 	/**
-	 * 通过key返回zset中value的排名 下标从小到大排序
+	 * 通过key返回zset中value的排 下标从小到大排序
 	 * 
 	 * @param key
 	 * @param member
@@ -1629,7 +1592,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key返回zset中value的排名 下标从大到小排序
+	 * 通过key返回zset中value的排 下标从大到小排序
 	 * 
 	 * @param key
 	 * @param member
@@ -1651,7 +1614,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key将获取score从start到end中zset的value socre从大到小排序 当start为0 end为-1时返回全部
+	 * 通过key将获取score从start到end中zset的value socre从大到小排序 当start0 end-1时返回全
 	 * 
 	 * @param key
 	 * @param start
@@ -1720,7 +1683,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 返回指定区间内zset中value的数量
+	 * 返回指定区间内zset中value的数
 	 * 
 	 * @param key
 	 * @param min
@@ -1764,7 +1727,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 通过key获取zset中value的score值
+	 * 通过key获取zset中value的score
 	 * 
 	 * @param key
 	 * @param member
@@ -1832,7 +1795,7 @@ public class JedisUtils {
 	}
 
 	/**
-	 * 返回满足pattern表达式的所有key keys(*) 返回所有的key
+	 * 返回满足pattern表达式的有key keys(*) 返回有的key
 	 * 
 	 * @param pattern
 	 * @return
