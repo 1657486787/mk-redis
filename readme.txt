@@ -118,8 +118,9 @@ redis
         切换数据库：select 15
 
 3.redis客户端
-    详见redis-demo
-
+    3.1入门例子：详见redis-demo
+    3.2redis实战：
+        3.2.1使用redis+lua脚本实现抢红包实战：详见redis-redpack
 
 4.其他特性
 
