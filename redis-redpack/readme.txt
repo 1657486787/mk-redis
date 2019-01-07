@@ -1,4 +1,4 @@
-使用redis+lua脚本实现抢红包实战
+redis实战-使用redis+lua脚本实现抢红包实战
 1.引入依赖
     <dependency>
         <groupId>redis.clients</groupId>

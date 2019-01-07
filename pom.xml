@@ -12,6 +12,7 @@
     <module>redis-article</module>
       <module>redis-demo</module>
       <module>redis-redpack</module>
+    <module>redis-cartshop</module>
   </modules>
 
   <name>mk-redis</name>

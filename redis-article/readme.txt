@@ -1,4 +1,4 @@
-文章投票项目
+redis实战-文章投票项目
 1.引入依赖
     <dependency>
         <groupId>org.springframework.data</groupId>
@@ -46,4 +46,4 @@
     为节约内存，一篇文章发表后，7天内可以投票,7天过后就不能再投票了
     为防止同一用户多次投票，用户只能给一篇文章投一次票
 
-    运行：TestArticleService进行单元测试
+    入口：TestArticleService进行单元测试
