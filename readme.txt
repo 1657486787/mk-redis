@@ -120,7 +120,9 @@ redis
 3.redis客户端
     3.1入门例子：详见redis-demo
     3.2redis实战：
-        3.2.1使用redis+lua脚本实现抢红包实战：详见redis-redpack
+        3.2.1redis实战-使用redis+lua脚本实现抢红包
+        3.2.2redis实战-文章投票项目
+        3.2.3redis实战-购物车项目
 
 4.其他特性
 
