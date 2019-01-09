@@ -4,6 +4,7 @@ redis
 
 1.下载及安装
 	官网：https://redis.io
+	中文官网：http://www.redis.net.cn
 	参考：http://www.runoob.com/redis/redis-install.html
 	1.1下载
 		windows:https://github.com/MicrosoftArchive/redis/releases（官网已无window版本下载链接）
@@ -22,7 +23,7 @@ redis
 
 
 2.命令
-	redis键值对中的值有五种基本数据结构，最大支持512M：string(字符串)，list（列表），hash（哈希），set（集合），zset（有序集合）
+	redis键值对中的值有丰富的数据类型，其中最常见的有5种，最大支持512M：string(字符串)，list（列表），hash（哈希），set（集合），zset（有序集合）
 
 	使用场景：
 	1.缓存：合理使用缓存加快数据访问速度，降低后端数据源压力，如可以使用string
@@ -320,3 +321,215 @@ redis
                     1) "message"
                     2) "class:20170101"
                     3) "hello word! I am B"
+
+5.redis持久化
+    redis是内存数据库，一旦断电或进程退出，数据就会丢失，所以就有了redis持久化。redis持久化有两种方式：RDB,AOF
+    5.1RDB:
+        RDB持久化把当前进程数据生成快照（.rdb）文件保存到硬盘的过程，有手动触发和自动触发。手动触发有save和bgsave两命令
+        save命令：阻塞当前Redis，直到RDB持久化过程完成为止，若内存实例比较大会造成长时间阻塞，线上环境不建议用它
+        bgsave命令：是对save的优化。redis进程执行fork操作创建子线程，由子线程完成持久化，阻塞时间很短（微秒级），是save的优化,在执行redis-cli shutdown关闭redis服务时，如果没有开启AOF持久化，自动执行bgsave;
+
+        命令：config set dir /usr/local  //设置rdb文件保存路径
+        备份：bgsave  //将dump.rdb保存到usr/local下
+        恢复：将dump.rdb放到redis安装目录与redis.conf同级目录，重启redis即可
+        优点：1.压缩后的二进制文，适用于备份、全量复制，用于灾难恢复
+             2.加载RDB恢复数据远快于AOF方式
+        缺点：1.无法做到实时持久化，每次都要创建子进程，频繁操作成本过高
+             2.保存后的二进制文件，存在老版本不兼容新版本rdb文件的问题
+
+    5.2AOF(append only file):
+        针对RDB不适合实时持久化，redis提供了AOF持久化方式来解决
+        开启：redis.conf设置：appendonly yes  (默认不开启，为no)
+        默认文件名：appendfilename "appendonly.aof"
+        流程说明：1.所有的写入命令(set hset)会append追加到aof_buf缓冲区中
+                 2.AOF缓冲区向硬盘做sync同步
+                 3.随着AOF文件越来越大，需定期对AOF文件rewrite重写，达到压缩
+                 4.当redis服务重启，可load加载AOF文件进行恢复
+        AOF持久化流程：命令写入(append),文件同步(sync),文件重写(rewrite),重启加载(load)
+                     命令写入--append-->aof缓冲--sync-->aof文件(rewrite)<--load--重启
+
+        redis的AOF配置详解：
+        appendonly yes     //启用aof持久化方式
+        # appendfsync always //每收到写命令就立即强制写入磁盘，最慢的，但是保证完全的持久化，不推荐使用
+        appendfsync everysec //每秒强制写入磁盘一次，性能和持久化方面做了折中，推荐
+        # appendfsync no    //完全依赖os，性能最好,持久化没保证（操作系统自身的同步）
+        no-appendfsync-on-rewrite  yes  //正在导出rdb快照的过程中,要不要停止同步aof
+        auto-aof-rewrite-percentage 100  //aof文件大小比起上次重写时的大小,增长率100%时,重写
+        auto-aof-rewrite-min-size 64mb   //aof文件,至少超过64M时,重写
+
+        如何从AOF恢复: 1. 设置appendonly yes； 2. 将appendonly.aof放到dir参数指定的目录；3. 启动Redis，Redis会自动加载appendonly.aof文件。
+
+    5.3redis重启时恢复加载AOF与RDB顺序及流程：
+        1.当AOF和RDB文件同时存在时，优先加载
+        2.若关闭了AOF，加载RDB文件
+        3.加载AOF/RDB成功，redis重启成功
+        4.AOF/RDB存在错误，redis启动失败并打印错误信息
+
+    5.4RDB与AOF区别：
+        RDB:1.适用于备份，全量复制，用于灾难恢复，加载RDB恢复数据远快于AOF。
+            2.但是无法做到实时持久化，每次都需要创建子进程，频繁操作成本过高。
+            3.保存的dump.rdb二进制文件，存在老版本不兼容新版本的问题
+            4.系统默认的持久化方式
+        AOF:1.实时持久化，该机制可以带来更高的数据安全性，即数据持久性。Redis中提供了3中同步策略，即每秒同步、每修改同步和不同步。事实上，每秒同步也是异步完成的，其效率也是非常高的，所差的是一旦系统出现宕机现象，那么这一秒钟之内修改的数据将会丢失。而每修改同步，我们可以将其视为同步持久化，即每次发生的数据变化都会被立即记录到磁盘中。可以预见，这种方式在效率上是最低的
+            2.AOF包含一个格式清晰、易于理解的日志文件用于记录所有的修改操作。事实上，我们也可以通过该文件完成数据的重建
+            3.对于相同的数据集来说，AOF 文件的体积通常要大于 RDB 文件的体积
+6.主从复制
+    6.1主从复制
+       a,方式一、新增redis6380.conf, 加入slaveof 192.168.42.111 6379,  在6379启动完后再启6380，完成配置；
+       b,方式二、redis-server --slaveof 192.168.42.111 6379
+       c,查看状态：info replication
+       d,断开主从复制：在slave节点，执行6380:>slaveof no one
+       e,断开后再变成主从复制：6380:> slaveof 192.168.42.111 6379
+       f,数据较重要的节点，主从复制时使用密码验证： requirepass
+       e,从节点建议用只读模式slave-read-only=yes, 若从节点修改数据，主从数据不一致
+       h,传输延迟：主从一般部署在不同机器上，复制时存在网络延时问题，redis提供repl-disable-tcp-nodelay参数决定是否关闭TCP_NODELAY,默认为关闭
+        参数关闭时：无论大小都会及时发布到从节点，占带宽，适用于主从网络好的场景，
+        参数启用时：主节点合并所有数据成TCP包节省带宽，默认为40毫秒发一次，取决于内核，主从的同步延迟40毫秒，适用于网络环境复杂或带宽紧张，如跨机房
+    6.2主从拓扑-支持单层或多层
+        6.2.1一主一从：用于主节点故障转移从节点，当主节点的“写”命令并发高且需要持久化，可以只在从节点开启AOF（主节点不需要），这样即保证了数据的安全性，也避免持久化对主节点的影响
+        6.2.2一主多从：针对“读”较多的场景，“读”由多个从节点来分担，但节点越多，主节点同步到多节点的次数也越多，影响带宽，也加重主节点的稳定
+        6.2.3树状主从：一主多从的缺点（主节点推送次数多压力大）可用些方案解决，主节点只推送一次数据到从节点1，再由从节点2推送到11，减轻主节点推送的压力
+    6.3复制原理
+        从节点执行slave master port后，与主节点连接，同步主节点的数据,6380:>info replication：查看主从及同步信息
+        1.保存主节点信息 2.主从建立socket连接  3.发送ping命令 4.权限验证 5.同步数据集 6.命令持续复制
+    6.4数据同步
+        redis 2.8版本以上使用psync命令完成同步，过程分“全量”与“部分”复制
+        全量复制：一般用于初次复制场景（第一次建立SLAVE后全量）
+        部分复制：网络出现问题，从节占再次连主时，主节点补发缺少的数据，每次	数据增加同步
+        心跳：主从有长连接心跳，主节点默认每10S向从节点发ping命令，repl-ping-slave-period控制发送频率
+    6.5 步骤
+        可以在不同的机器上搭建redis服务器作为集群，也可以在同一台机器上执行不同的端口作为不同redis服务器的实例，以下以第二种方式搭建（一主两从）集群
+        master:./redis-server config_ms/redis_master_6379.conf &
+        slave1:./redis-server config_ms/redis_slave_6380.conf &
+        slave2:./redis-server config_ms/redis_slave_6381.conf &
+        其中在从节点的配置文件中新增：
+        slaveof 127.0.0.1 6379
+        masterauth "111111" (如果主节点有配置密码requirepass 111111,那么需要在从节点增加该配置)
+
+        查看状态：执行info replication可以查看主/从节点的信息
+            127.0.0.1:6379> info replication
+            # Replication
+            role:master
+            connected_slaves:2
+            slave0:ip=47.107.146.57,port=6380,state=online,offset=979,lag=1
+            slave1:ip=47.107.146.57,port=6381,state=online,offset=979,lag=0
+
+        注意：启动redis服务器可以指定端口不需要指定配置文件：./redis-server --port 6390&
+             从节点只能进行读操作，不能写操作，如set,mset等
+
+7.Sentinel哨兵
+    Sentinel哨兵是高可用的解决方案。有一个或多个sentinel实例组成的Sentinel系统可以监视主从服务器，当主服务器挂掉之后，自动将某一个从节点升级为主节点，并将其他从节点关联新的主节点
+    什么是高可用：解释一：指服务的冗余，一个服务挂了，可以自动切换到另外一个服务上，不影响客户体验。 解释二:它与被认为是不间断操作的容错技术有所不同。是目前企业防止核心系统因故障而无法工作的最有效保护手段
+
+    7.1为什么有哨兵机制？
+        1.我们学习了redis的主从复制，但如果说主节点出现问题不能提供服务，需要人工重新把从节点设为主节点，还要通知我们的应用程序更新了主节点的地址，这种处理方式不是科学的，耗时费事
+        2.同时主节点的写能力是单机的，能力能限
+        3.而且主节点是单机的，存储能力也有限
+        其中2，3的问题在后面redis集群课会讲，第1个问题我们用哨兵机制来解决
+    7.2主从故障如何故障转移(不满足高可用)
+        1.主节点(master)故障，从节点slave-1端执行 slaveof no one后变成新主节点
+        2.其它的节点成为新主节点的从节点，并从新节点复制数据
+    7.3哨兵机制的高可用
+        7.3.1原理：当主节点出现故障时，由Redis Sentinel自动完成故障发现和转移，并通知应用方，实现高可用性
+        7.3.2过程：
+            其实整个过程只需要一个哨兵节点来完成，首先使用Raft选举算法实现选举机制，选出一个哨兵节点来完成转移和通知
+            哨兵有三个定时监控任务完成对各节点的发现和监控：
+                任务1.每个哨兵节点每10秒会向主节点和从节点发送info命令获取最拓扑结构图，哨兵配置时只要配置对主节点的监控即可，通过向主节点发送info，获取从节点的信息，并当有新的从节点加入时可以马上感知到
+                任务2.每个哨兵节点每隔2秒会向redis数据节点的指定频道上发送该哨兵节点对于主节点的判断以及当前哨兵节点的信息，同时每个哨兵节点也会订阅该频道，来了解其它哨兵节点的信息及对主节点的判断，其实就是通过消息publish和subscribe来完成的
+                任务3.每隔1秒每个哨兵会向主节点、从节点及其余哨兵节点发送一次ping命令做一次心跳检测，这个也是哨兵用来判断节点是否正常的重要依据
+        7.3.3主观下线和客观下线：
+            主观下线：哨兵节点每隔1秒对主节点和从节点、其它哨兵节点发送ping做心跳检测，当这些心跳检测时间超过down-after-milliseconds时，哨兵节点则认为该节点错误或下线，这叫主观下线；这可能会存在错误的判断
+            客观下线：当主观下线的节点是主节点时，此时该哨兵3节点会通过指令sentinel is-masterdown-by-addr寻求其它哨兵节点对主节点的判断，当超过quorum（法定人数）个数，此时哨兵节点则认为该主节点确实有问题，这样就客观下线了，大部分哨兵节点都同意下线操作，也就说是客观下线
+        7.3.4领导者哨兵选举流程：
+             1.每个在线的哨兵节点都可以成为领导者，当它确认（比如哨兵3）主节点下线时，会向其它哨兵发is-master-down-by-addr命令，征求判断并要求将自己设置为领导者，由领导者处理故障转移；
+             2.当其它哨兵收到此命令时，可以同意或者拒绝它成为领导者；
+             3.如果哨兵3发现自己在选举的票数大于等于num(sentinels)/2+1时，将成为领导者，如果没有超过，继续选举…………
+        7.3.5故障转移机制
+             1.由Sentinel节点定期监控发现主节点是否出现了故障。sentinel会向master发送心跳PING来确认master是否存活，如果master在“一定时间范围”内不回应PONG 或者是回复了一个错误消息，那么这个sentinel会主观地(单方面地)认为这个master已经不可用了
+             2.当主节点出现故障，此时3个Sentinel节点共同选举了Sentinel3节点为领导，负载处理主节点的故障转移
+             3.由Sentinel3领导者节点执行故障转移，过程和主从复制一样，但是自动执行
+                流程： 1.将slave-1脱离原从节点，升级主节点 2.将从节点slave-2指向新的主节点 3.通知客户端主节点已更换  4.将原主节点（oldMaster）变成从节点，指向新的主节点
+             4.故障转移后的redis sentinel的拓扑结构图
+        7.3.6哨兵机制－故障转移详细流程
+            1.过滤掉不健康的（下线或断线），没有回复过哨兵ping响应的从节点
+            2.选择salve-priority从节点优先级最高（redis.conf）
+            3.选择复制偏移量最大，指复制最完整的从节点
+        7.3.7如何安装和部署Reids Sentinel?
+                我们以3个Sentinel节点、2个从节点、1个主节点为例进行安装部署
+                1.前提：先搭好一主两从redis的主从复制，和之前复制搭建一样，搭建方式如下：
+                    1.主节点6379节点（/usr/local/bin/conf/redis6379.conf）：
+                        修改 requirepass 111111，注释掉#bind 127.0.0.1
+                    2.从节点redis6380.conf和redis6381.conf:
+                        修改 requirepass 111111 ,注释掉#bind 127.0.0.1,
+                        加上masterauth 111111 ,加上slaveof 127.0.0.1 6379
+                    注意：当主从起来后，主节点可读写，从节点只可读不可写
+                2.redis哨兵机制核心配置sentinel.conf(也是3个节点)：
+                    将sentinel.conf复制三份，变为如下：
+                       /usr/local/bin/conf/sentinel_26379.conf
+                       /usr/local/bin/conf/sentinel_26380.conf
+                       /usr/local/bin/conf/sentinel_26381.conf
+                    将三个文件的端口改成: 26379   26380   26381
+                    然后：sentinel monitor mymaster 127.0.0.1 6379 2  //监听主节点6379
+                         sentinel auth-pass mymaster 111111     //连接主节点时的密码
+                         protected-mode no
+                    三个配置除端口外，其它一样
+                3.哨兵其它的配置（非必填）：
+                    sentinel monitor mymaster 127.0.0.1 6379 2
+                    //监控主节点的IP地址端口，sentinel监控的master的名字叫做mymaster,2代表当集群中有2个sentinel认为master死了时，才能真正认为该master已经不可用了
+                    sentinel auth-pass mymaster 111111  //sentinel连主节点的密码
+                    sentinel config-epoch mymaster 2  //故障转移时最多可以有2从节点同时对新主节点进行数据同步
+                    sentinel leader-epoch mymaster 2
+                    sentinel failover-timeout mymasterA 180000 //故障转移超时时间180s，
+                        a,如果转移超时失败，下次转移时时间为之前的2倍；
+                        b,从节点变主节点时，从节点执行slaveof no one命令一直失败的话，当时间超过180S时，则故障转移失败
+                        c,从节点复制新主节点时间超过180S转移失败
+                    sentinel down-after-milliseconds mymasterA 300000//sentinel节点定期向主节点ping命令，当超过了300S时间后没有回复，可能就认定为此主节点出现故障了……
+                    sentinel parallel-syncs mymasterA 1 //故障转移后，1代表每个从节点按顺序排队一个一个复制主节点数据，如果为3，指3个从节点同时并发复制主节点数据，不会影响阻塞，但存在网络和IO开销
+                4.启动sentinel服务:
+                    ./redis-sentinel conf/sentinel_26379.conf &
+                    ./redis-sentinel conf/sentinel_26380.conf &
+                    ./redis-sentinel conf/sentinel_26381.conf &
+                    关闭：./redis-cli -h 127.0.0.1 -p 26379 shutdown
+                5.测试：kill -9 6379  杀掉6379的redis服务
+                    看日志是分配6380 还是6381做为主节点，当6379服务再启动时，已变成从节点
+                    假设6380升级为主节点:进入6380>info replication     可以看到role:master
+                    打开sentinel_26379.conf等三个配置，sentinel monitor mymaster 127.0.0.1 6380 2
+                    打开redis6379.conf等三个配置, slaveof 127.0.0.1 6380,也变成了6380
+                    注意：生产环境建议让redis Sentinel部署到不同的物理机上。
+                    重要：sentinel monitor mymaster 127.0.0.1 6379 2 //切记将IP不要写成127.0.0.1
+                    不然使用JedisSentinelPool取jedis连接的时候会变成取127.0.0.1 6379的错误地址
+                    注：我们稍后要启动四个redis实例，其中端口为6379 的redis设为master，其他两个设为slave 。所以mymaster 后跟的是master的ip和端口，最后一个’2’代表只要有2个sentinel认为master下线，就认为该master客观下线，选举产生新的master。通常最后一个参数不能多于启动的sentinel实例数。
+                    哨兵sentinel个数为奇数，选举嘛，奇数哨兵个才能选举成功，一般建议3个
+                6.RedisSentinel如何监控2个redis主节点呢？
+                    sentinel monitor mymasterA 192.168.1.20 6379 2
+                    sentinel monitor mymasterB 192.168.1.21 6379 2
+                7.部署建议：
+                    1.sentinel节点应部署在多台物理机（线上环境）
+                    2.至少三个且奇数个sentinel节点
+                    3.通过以上我们知道，3个sentinel可同时监控一个主节点或多个主节点
+                        监听N个主节点较多时，如果sentinel出现异常，会对多个主节点有影响，同时还会造成sentinel节点产生过多的网络连接，
+                        一般线上建议还是， 3个sentinel监听一个主节点
+                8.sentinel哨兵的API
+                       命令：redis-cli -p 26379  //进入哨兵的命令模式，使用redis-cli进入
+                      26379>sentinel masters或sentinel master mymaster //查看redis主节点相关信息
+                      26379>sentinel slaves mymaster  //查看从节点状态与相关信息
+                      26379>sentinel sentinels mymaster //查sentinel节点集合信息(不包括当前26379)
+                      26379>sentinel failover mymaster //对主节点强制故障转移，没和其它节点协商
+
+                9.客户端连接（redis-sentinel例子工程）
+                   远程客户端连接时，要打开protected-mode no
+                   ./redis-cli -p 26380 shutdown //关闭
+                   在使用工程redis-sentinel，调用jedis查询的流程如下：
+                     1.将三个sentinel的IP和地址加入JedisSentinelPool
+                     2.根据IP和地址创建JedisSentinelPool池对象
+                     3.在这个对象创建完后，此时该对象已把redis的主节点
+                   （此时sentinel monitor mymaster 必须写成192.168.42.111 6379 2，不能为127.0.0.1，不然查询出来的主节点的IP在客户端就变成了127.0.0.1，拿不到连接了）查询出来了，当客户准备发起查询请求时，调用pool.getResource()借用一个jedis对象，内容包括主节点的IP和端口；
+                     4.将得到jedis对象后，可执行jedis.get(“age”)指令了……
+
+
+
+
+
+
+
+
