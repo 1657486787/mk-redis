@@ -1,0 +1,68 @@
+下载链接：https://pan.baidu.com/s/1kWsf3Rh 密码：n3pc
+从这个链接下载  ruby-2.3.1.tar.gz   和  redis-3.3.0.gem
+  tar -zxvf ruby-2.3.1.tar.gz 
+  a,  cd ruby-2.3.1
+  b,  ./configure -prefix=/usr/local/ruby
+  c,  make && make install   //过程会有点慢，大概5－10分钟
+  d,  然后gem install -l redis-3.3.0.gem  //若没有gem需要安装yum install gem -y
+  e, 准备好6个节点配置文件redis6379.conf....redis6391.conf, 加上bind 172.18.133.102
+  f,（注意不要设置requirepass,不然./redis-trib访问不了……）,将/usr/local/bin/clusterconf/data的config-file删除；
+  g, 依次启动6个节点：./redis-server clusterconf/redis6379.conf
+  h, 如果之前redis有数据存在，flushall清空；(坑:不需要cluster meet ..)
+  i, ./redis-trib.rb create --replicas 1 172.18.133.102:6379 172.18.133.102:6380 172.18.133.102:6381 172.18.133.102:6389 172.18.133.102:6390 172.18.133.102:6391
+
+
+下载
+wget https://cache.ruby-lang.org/pub/ruby/2.6/ruby-2.6.0.tar.gz
+wget https://rubygems.org/downloads/redis-3.3.0.gem
+
+
+在当前目录及子目录下的.c文件中替换字符串"192.168.0.112"为"172.18.133.102"
+find . -name "*.conf" -print | xargs perl -pi -e 's/192.168.0.112/172.18.133.102/g'
+
+
+替换cluster-config-file配置的路径cluster-config-file  /usr/local/bin/clusterconf/data/nodes-6382.conf
+find . -name "*.conf" -print | xargs perl -pi -e 's/usr\/local\/bin\/clusterconf\/data/sgy\/soft\/redis\/redis_cmd\/clusterconfig\/data/g'
+
+
+集群分配
+./redis-trib.rb create --replicas 1 172.18.133.102:6379 172.18.133.102:6380 172.18.133.102:6381 172.18.133.102:6389 172.18.133.102:6390 172.18.133.102:6391
+
+
+客户端链接
+./redis-cli -h 172.18.133.102 -p 6379 -c
+
+
+搭建redis集群时报错“create ERR Slot 9838 is already busy (Redis::CommandError)”，看打印好像分配slots时就重叠了一部分，请问这要怎么解决呢。
+使用redis-cli登录到每个节点执行 flushall 和cluster reset
+
+
+=======================新增集群的节点6382/6392=========================
+
+新增集群主节点
+./redis-trib.rb add-node 172.18.133.102:6382 172.18.133.102:6379
+
+新增集群从节点
+redis-trib.rb add-node --slave --master-id 8dac721679b5b3b5117fa4aec821bc50bc1a2db3 172.18.133.102:6392 172.18.133.102:6379 
+
+
+//为新主节点重新分配solt
+redis-trib.rb reshard 172.18.133.102:6382   
+
+
+
+
+=======================删除集群的节点6382/6392=========================
+一种是主节点6382，一种是从节点6392。
+在从节点6392中，没有分配哈希槽，执行
+./redis-trib.rb del-node 172.18.133.102:6392 91751f4031582d26558517d517685e57cde77590 有两个参数ip：port  和节点的id。 从节点6392从集群中删除了。
+
+
+主节点6382删除步骤：
+1，./redis-trib.rb reshard 172.18.133.102:6382
+  问我们有多少个哈希槽要移走，因为我们这个节点上刚分配了1000 个所以我们这里输入1000
+
+2，最后
+./redis-trib.rb del-node 172.18.133.102:6382 8dac721679b5b3b5117fa4aec821bc50bc1a2db3
+
+

@@ -1,0 +1,7 @@
+1,在redis.conf第89行，将protected-mode no
+2,在redis.conf第71行修改下bind 192.168.42.111  (ip为你linux的ip);
+3,在redis.conf第502行，加上 requirepass "12345678"， 登录密码
+
+测试：
+1，启动redis:  ./redis-server redis.conf &
+2, 连接redis:  ./redis-cli -h 192.168.42.111 -p 6379 -a 12345678
